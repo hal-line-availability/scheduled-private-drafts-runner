@@ -36,10 +36,30 @@ jobs:
             exit 1
           fi
       - name: Generate drafts without customer delivery
+        id: generate
+        continue-on-error: true
         env:
           SOURCE_DATABASE_URL: ${{ secrets.SOURCE_DATABASE_URL }}
           RUN_MODE: ${{ inputs.mode || 'prepare' }}
         run: python generator/work/github_daily_drafts.py --mode "$RUN_MODE"
+      - name: Record private result
+        env:
+          GENERATION_OUTCOME: ${{ steps.generate.outcome }}
+          RUN_MODE: ${{ inputs.mode || 'prepare' }}
+        run: |
+          python - <<'PYTHON'
+          import json, os
+          from datetime import datetime, timezone
+          from pathlib import Path
+          outcome = os.environ['GENERATION_OUTCOME']
+          status = 'verified' if os.environ['RUN_MODE']=='verify' else 'draft_prepared'
+          Path('generator/outputs').mkdir(exist_ok=True)
+          Path('generator/outputs/last-run.json').write_text(json.dumps({
+              'status': status if outcome=='success' else 'needs_attention',
+              'attempted_at': datetime.now(timezone.utc).isoformat(),
+              'customer_sent': False,
+          }))
+          PYTHON
       - name: Open private draft storage
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
@@ -53,10 +73,12 @@ jobs:
           if [ -d generator/outputs/generated ]; then
             mkdir -p private-draft-store/current
             cp generator/outputs/generated/* private-draft-store/current/
-          else
+          elif [ -f generator/outputs/verification.json ]; then
             mkdir -p private-draft-store/status
             cp generator/outputs/verification.json private-draft-store/status/source-connection.json
           fi
+          mkdir -p private-draft-store/status
+          cp generator/outputs/last-run.json private-draft-store/status/last-run.json
           cd private-draft-store
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
@@ -65,3 +87,8 @@ jobs:
             git commit -m 'Prepare daily private drafts; no customer delivery'
             git push origin HEAD:drafts
           fi
+      - name: Report stopped generation
+        if: steps.generate.outcome == 'failure'
+        run: |
+          echo 'Source verification failed. Previous private drafts were retained. No customer delivery.'
+          exit 1
