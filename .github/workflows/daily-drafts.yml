@@ -35,6 +35,10 @@ jobs:
             echo 'Generator validation failed. No source data was retrieved.'
             exit 1
           fi
+          if ! node generator/work/test_editor_ui.cjs >> validation.log 2>&1; then
+            echo 'Editor validation failed. No source data was retrieved.'
+            exit 1
+          fi
       - name: Generate drafts without customer delivery
         id: generate
         continue-on-error: true
