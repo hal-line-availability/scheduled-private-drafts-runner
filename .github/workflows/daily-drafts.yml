@@ -59,10 +59,15 @@ jobs:
           status = 'verified' if os.environ['RUN_MODE']=='verify' else 'draft_prepared'
           Path('generator/outputs').mkdir(exist_ok=True)
           if os.environ['RUN_MODE'] != 'verify':
+              reason={}
+              failure=Path('generator/outputs/source-not-ready.json')
+              if outcome!='success' and failure.exists():
+                  reason={'reason':json.loads(failure.read_text())['reason']}
               Path('generator/outputs/last-run.json').write_text(json.dumps({
                   'status': status if outcome=='success' else 'needs_attention',
                   'attempted_at': datetime.now(timezone.utc).isoformat(),
                   'customer_sent': False,
+                  **reason,
               }))
           PYTHON
       - name: Open private draft storage
