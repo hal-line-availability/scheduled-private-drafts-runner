@@ -54,11 +54,12 @@ jobs:
           outcome = os.environ['GENERATION_OUTCOME']
           status = 'verified' if os.environ['RUN_MODE']=='verify' else 'draft_prepared'
           Path('generator/outputs').mkdir(exist_ok=True)
-          Path('generator/outputs/last-run.json').write_text(json.dumps({
-              'status': status if outcome=='success' else 'needs_attention',
-              'attempted_at': datetime.now(timezone.utc).isoformat(),
-              'customer_sent': False,
-          }))
+          if os.environ['RUN_MODE'] != 'verify':
+              Path('generator/outputs/last-run.json').write_text(json.dumps({
+                  'status': status if outcome=='success' else 'needs_attention',
+                  'attempted_at': datetime.now(timezone.utc).isoformat(),
+                  'customer_sent': False,
+              }))
           PYTHON
       - name: Open private draft storage
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
@@ -78,7 +79,9 @@ jobs:
             cp generator/outputs/verification.json private-draft-store/status/source-connection.json
           fi
           mkdir -p private-draft-store/status
-          cp generator/outputs/last-run.json private-draft-store/status/last-run.json
+          if [ -f generator/outputs/last-run.json ]; then
+            cp generator/outputs/last-run.json private-draft-store/status/last-run.json
+          fi
           cd private-draft-store
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
