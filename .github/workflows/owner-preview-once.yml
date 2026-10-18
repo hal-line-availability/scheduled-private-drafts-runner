@@ -1,0 +1,52 @@
+name: Approved single-owner preview
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: approved-owner-preview-20261018-2300
+  cancel-in-progress: false
+jobs:
+  preview:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 16
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: jimuin0/hal-line-drafts
+          ssh-key: ${{ secrets.PRIVATE_DRAFTS_DEPLOY_KEY }}
+          persist-credentials: false
+          path: generator
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: jimuin0/hal-line-drafts
+          ref: drafts
+          ssh-key: ${{ secrets.PRIVATE_DRAFTS_DEPLOY_KEY }}
+          persist-credentials: true
+          path: private-state
+      - name: Send only the explicitly approved owner preview
+        id: send
+        continue-on-error: true
+        env:
+          OWNER_PREVIEW_TOKEN: ${{ secrets.OWNER_PREVIEW_TOKEN }}
+          OWNER_PREVIEW_APPROVAL: ${{ secrets.OWNER_PREVIEW_APPROVAL }}
+          PREVIEW_CONTENT_DIR: generator/outputs/editor-draft
+          PREVIEW_LEDGER: private-state/status/owner-preview-20261018-2300.json
+        run: |
+          if ! python generator/work/owner_preview_once.py > owner-preview.log 2>&1; then
+            echo 'Single-owner preview stopped. No customer broadcast was attempted.'
+            exit 1
+          fi
+      - name: Keep the outcome private
+        if: always()
+        run: |
+          cd private-state
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add status/owner-preview-20261018-2300.json 2>/dev/null || true
+          if ! git diff --cached --quiet; then
+            git commit -m 'Record the approved single-owner preview result'
+            git push origin HEAD:drafts
+          fi
+      - if: steps.send.outcome == 'failure'
+        run: exit 1
