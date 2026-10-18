@@ -16,7 +16,7 @@ concurrency:
 jobs:
   prepare:
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 25
     steps:
       - name: Read private generator
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
@@ -45,6 +45,8 @@ jobs:
         env:
           SOURCE_DATABASE_URL: ${{ secrets.SOURCE_DATABASE_URL }}
           RUN_MODE: ${{ inputs.mode || 'prepare' }}
+          DRAFT_RETRY_MINUTES: '20'
+          DRAFT_SCHEDULED_RUN: ${{ github.event_name == 'schedule' && 'true' || 'false' }}
         run: python generator/work/github_daily_drafts.py --mode "$RUN_MODE"
       - name: Record private result
         env:
