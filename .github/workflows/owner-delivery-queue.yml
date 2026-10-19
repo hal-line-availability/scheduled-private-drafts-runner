@@ -1,0 +1,30 @@
+name: Process approved private owner previews
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '*/5 * * * *'
+permissions:
+  contents: read
+concurrency:
+  group: private-owner-preview-queue
+  cancel-in-progress: false
+jobs:
+  process:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: jimuin0/hal-line-drafts
+          ssh-key: ${{ secrets.PRIVATE_DRAFTS_DEPLOY_KEY }}
+          persist-credentials: false
+          path: generator
+      - name: Check only explicitly confirmed private owner jobs
+        env:
+          PRIVATE_DRAFTS_DEPLOY_KEY: ${{ secrets.PRIVATE_DRAFTS_DEPLOY_KEY }}
+          OWNER_LINE_TOKEN: ${{ secrets.OWNER_LINE_TOKEN }}
+        run: |
+          if ! python generator/work/run_owner_delivery_queue.py > owner-queue.log 2>&1; then
+            echo 'Private owner queue check failed. No customer broadcast is supported.'
+            exit 1
+          fi
