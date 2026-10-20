@@ -6,5 +6,7 @@ Customer message delivery is not implemented.
 
 The first daily event starts at 17:03 JST and waits for 17:30 before reading the
 private source. A second event at 17:43 is a safe catch-up for a delayed or lost
-first event. Repeating preparation only replaces the private unsent draft pair;
-it has no LINE customer-delivery path.
+first event. It verifies the private manifest and both message hashes first; when
+the 17:30 pair is complete, it exits without rewriting drafts or owner edits.
+Recovery only replaces the private unsent draft pair and has no LINE
+customer-delivery path.

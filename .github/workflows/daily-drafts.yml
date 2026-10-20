@@ -34,6 +34,14 @@ jobs:
         with:
           python-version: '3.12'
       - run: pip install --disable-pip-version-check -r generator/requirements.txt
+      - name: Open private draft storage
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          repository: jimuin0/hal-line-drafts
+          ref: drafts
+          path: private-draft-store
+          ssh-key: ${{ secrets.PRIVATE_DRAFTS_DEPLOY_KEY }}
+          persist-credentials: true
       - name: Validate generator
         run: |
           if ! python -m unittest discover -s generator/work -p 'test_*.py' > validation.log 2>&1; then
@@ -44,8 +52,20 @@ jobs:
             echo 'Editor validation failed. No source data was retrieved.'
             exit 1
           fi
+      - name: Keep a successful 17:30 pair during the catch-up event
+        id: catchup
+        env:
+          SCHEDULE_EXPRESSION: ${{ github.event.schedule || '' }}
+        run: |
+          skip=false
+          if [ "$SCHEDULE_EXPRESSION" = '43 8 * * *' ] && python generator/work/github_daily_drafts.py --catchup-check private-draft-store; then
+            skip=true
+            echo 'The verified 17:30 pair already exists. Catch-up left it unchanged.'
+          fi
+          echo "skip=$skip" >> "$GITHUB_OUTPUT"
       - name: Generate drafts without customer delivery
         id: generate
+        if: steps.catchup.outputs.skip != 'true'
         continue-on-error: true
         env:
           SOURCE_DATABASE_URL: ${{ secrets.SOURCE_DATABASE_URL }}
@@ -54,6 +74,7 @@ jobs:
           DRAFT_SCHEDULED_RUN: ${{ (github.event_name == 'schedule' || inputs.at_target == true) && 'true' || 'false' }}
         run: python generator/work/github_daily_drafts.py --mode "$RUN_MODE"
       - name: Record private result
+        if: steps.catchup.outputs.skip != 'true'
         env:
           GENERATION_OUTCOME: ${{ steps.generate.outcome }}
           RUN_MODE: ${{ inputs.mode || 'prepare' }}
@@ -77,15 +98,8 @@ jobs:
                   **reason,
               }))
           PYTHON
-      - name: Open private draft storage
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
-        with:
-          repository: jimuin0/hal-line-drafts
-          ref: drafts
-          path: private-draft-store
-          ssh-key: ${{ secrets.PRIVATE_DRAFTS_DEPLOY_KEY }}
-          persist-credentials: true
       - name: Keep drafts private
+        if: steps.catchup.outputs.skip != 'true'
         run: |
           if [ -d generator/outputs/generated ]; then
             mkdir -p private-draft-store/current
@@ -107,7 +121,7 @@ jobs:
             git push origin HEAD:drafts
           fi
       - name: Report stopped generation
-        if: steps.generate.outcome == 'failure'
+        if: steps.catchup.outputs.skip != 'true' && steps.generate.outcome == 'failure'
         run: |
           echo 'Source verification failed. Previous private drafts were retained. No customer delivery.'
           exit 1
