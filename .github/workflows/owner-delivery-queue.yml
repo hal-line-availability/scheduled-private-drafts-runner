@@ -26,6 +26,7 @@ jobs:
       - name: Check only explicitly confirmed private owner jobs
         env:
           PRIVATE_DRAFTS_DEPLOY_KEY: ${{ secrets.PRIVATE_DRAFTS_DEPLOY_KEY }}
+          SLACK_FAILURE_BOT_TOKEN: ${{ secrets.SLACK_FAILURE_BOT_TOKEN }}
           SOURCE_DATABASE_URL: ${{ secrets.SOURCE_DATABASE_URL }}
           OWNER_LINE_TOKEN: ${{ secrets.OWNER_LINE_TOKEN }}
         run: |
