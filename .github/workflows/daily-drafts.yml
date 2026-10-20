@@ -7,7 +7,7 @@ on:
         default: prepare
         options: [prepare, verify]
   schedule:
-    - cron: '30 8 * * *'
+    - cron: '3 8 * * *'
 permissions:
   contents: read
 concurrency:
@@ -16,7 +16,7 @@ concurrency:
 jobs:
   prepare:
     runs-on: ubuntu-24.04
-    timeout-minutes: 25
+    timeout-minutes: 65
     steps:
       - name: Read private generator
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
