@@ -6,6 +6,10 @@ on:
         type: choice
         default: prepare
         options: [prepare, verify]
+      at_target:
+        description: Wait for the configured preparation time
+        type: boolean
+        default: false
   schedule:
     - cron: '3 8 * * *'
 permissions:
@@ -46,7 +50,7 @@ jobs:
           SOURCE_DATABASE_URL: ${{ secrets.SOURCE_DATABASE_URL }}
           RUN_MODE: ${{ inputs.mode || 'prepare' }}
           DRAFT_RETRY_MINUTES: '20'
-          DRAFT_SCHEDULED_RUN: ${{ github.event_name == 'schedule' && 'true' || 'false' }}
+          DRAFT_SCHEDULED_RUN: ${{ (github.event_name == 'schedule' || inputs.at_target == true) && 'true' || 'false' }}
         run: python generator/work/github_daily_drafts.py --mode "$RUN_MODE"
       - name: Record private result
         env:
