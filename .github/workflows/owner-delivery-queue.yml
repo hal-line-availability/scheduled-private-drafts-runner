@@ -1,6 +1,11 @@
 name: Process approved private owner previews
 on:
   workflow_dispatch:
+    inputs:
+      slack_connection_test:
+        description: Verify only the fixed Slack failure destination
+        type: boolean
+        default: false
   schedule:
     - cron: '*/5 * * * *'
 permissions:
@@ -23,7 +28,13 @@ jobs:
         with:
           python-version: '3.12'
       - run: pip install --disable-pip-version-check -r generator/requirements.txt
+      - name: Verify fixed Slack failure destination
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.slack_connection_test == true }}
+        env:
+          SLACK_FAILURE_BOT_TOKEN: ${{ secrets.SLACK_FAILURE_BOT_TOKEN }}
+        run: python generator/work/run_owner_delivery_queue.py --slack-test
       - name: Check only explicitly confirmed private owner jobs
+        if: ${{ github.event_name != 'workflow_dispatch' || inputs.slack_connection_test != true }}
         env:
           PRIVATE_DRAFTS_DEPLOY_KEY: ${{ secrets.PRIVATE_DRAFTS_DEPLOY_KEY }}
           SLACK_FAILURE_BOT_TOKEN: ${{ secrets.SLACK_FAILURE_BOT_TOKEN }}
