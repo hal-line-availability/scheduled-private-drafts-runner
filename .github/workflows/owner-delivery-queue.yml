@@ -40,6 +40,10 @@ jobs:
           SLACK_FAILURE_BOT_TOKEN: ${{ secrets.SLACK_FAILURE_BOT_TOKEN }}
           SOURCE_DATABASE_URL: ${{ secrets.SOURCE_DATABASE_URL }}
           OWNER_LINE_TOKEN: ${{ secrets.OWNER_LINE_TOKEN }}
+          ANNOUNCEMENT_LINE_TOKEN: ${{ secrets.ANNOUNCEMENT_LINE_TOKEN }}
+          INQUIRY_LINE_TOKEN: ${{ secrets.INQUIRY_LINE_TOKEN }}
+          # Enable only after an explicit customer-delivery authorization.
+          CUSTOMER_SEND_ENABLED: 'false'
         run: |
           if ! python generator/work/run_owner_delivery_queue.py > owner-queue.log 2>&1; then
             echo 'Private owner queue check failed. No customer broadcast is supported.'
