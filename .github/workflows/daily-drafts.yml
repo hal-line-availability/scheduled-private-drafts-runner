@@ -10,6 +10,10 @@ on:
         description: Wait for the configured preparation time
         type: boolean
         default: false
+      not_before:
+        description: Optional one-time target with timezone (manual prepare only)
+        type: string
+        default: ''
   schedule:
     # Start early for 17:30 JST and retry once later if GitHub delayed or lost the first event.
     - cron: '3 8 * * *'
@@ -73,6 +77,7 @@ jobs:
           RUN_MODE: ${{ inputs.mode || 'prepare' }}
           DRAFT_RETRY_MINUTES: '20'
           DRAFT_SCHEDULED_RUN: ${{ (github.event_name == 'schedule' || inputs.at_target == true) && 'true' || 'false' }}
+          DRAFT_MANUAL_NOT_BEFORE: ${{ github.event_name == 'workflow_dispatch' && inputs.not_before || '' }}
         run: python generator/work/github_daily_drafts.py --mode "$RUN_MODE"
       - name: Record private result
         if: steps.catchup.outputs.skip != 'true'
