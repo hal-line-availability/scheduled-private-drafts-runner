@@ -12,7 +12,8 @@ on:
         default: false
   schedule:
     # Start early for 17:30 JST and retry once later if GitHub delayed or lost the first event.
-    - cron: '3,43 8 * * *'
+    - cron: '3 8 * * *'
+    - cron: '43 8 * * *'
 permissions:
   contents: read
 concurrency:
