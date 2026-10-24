@@ -31,7 +31,7 @@ jobs:
       - name: Read private generator
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
-          repository: jimuin0/hal-line-drafts
+          repository: hal-line-availability/hal-line-drafts
           ssh-key: ${{ secrets.PRIVATE_DRAFTS_DEPLOY_KEY }}
           persist-credentials: false
           path: generator
@@ -42,7 +42,7 @@ jobs:
       - name: Open private draft storage
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
-          repository: jimuin0/hal-line-drafts
+          repository: hal-line-availability/hal-line-drafts
           ref: drafts
           path: private-draft-store
           ssh-key: ${{ secrets.PRIVATE_DRAFTS_DEPLOY_KEY }}
