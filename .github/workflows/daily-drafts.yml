@@ -57,13 +57,13 @@ jobs:
             echo 'Editor validation failed. No source data was retrieved.'
             exit 1
           fi
-      - name: Keep a successful 17:30 pair during the catch-up event
+      - name: Keep a successful pair from either preparation path
         id: catchup
         env:
-          SCHEDULE_EXPRESSION: ${{ github.event.schedule || '' }}
+          SCHEDULED_RUN: ${{ (github.event_name == 'schedule' || inputs.at_target == true) && 'true' || 'false' }}
         run: |
           skip=false
-          if [ "$SCHEDULE_EXPRESSION" = '43 8 * * *' ] && python generator/work/github_daily_drafts.py --catchup-check private-draft-store; then
+          if [ "$SCHEDULED_RUN" = 'true' ] && python generator/work/github_daily_drafts.py --catchup-check private-draft-store; then
             skip=true
             echo 'The verified 17:30 pair already exists. Catch-up left it unchanged.'
           fi
@@ -96,7 +96,8 @@ jobs:
               reason={}
               failure=Path('generator/outputs/source-not-ready.json')
               if outcome!='success' and failure.exists():
-                  reason={'reason':json.loads(failure.read_text())['reason']}
+                  detail=json.loads(failure.read_text())
+                  reason={key:detail[key] for key in ('reason','reason_code') if key in detail}
               Path('generator/outputs/last-run.json').write_text(json.dumps({
                   'status': status if outcome=='success' else 'needs_attention',
                   'attempted_at': datetime.now(timezone.utc).isoformat(),
