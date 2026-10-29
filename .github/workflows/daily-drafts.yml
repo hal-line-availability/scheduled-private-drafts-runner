@@ -28,6 +28,13 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 65
     steps:
+      - name: Record scheduled trigger timing
+        env:
+          TRIGGER_EVENT: ${{ github.event_name }}
+          SCHEDULE_EXPRESSION: ${{ github.event.schedule }}
+        run: |
+          printf 'Trigger: %s\nSchedule UTC: %s\nRunner started UTC: %s\n' \
+            "$TRIGGER_EVENT" "${SCHEDULE_EXPRESSION:-not scheduled}" "$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
       - name: Read private generator
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
