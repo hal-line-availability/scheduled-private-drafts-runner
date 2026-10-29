@@ -117,7 +117,7 @@ jobs:
           fi
           mkdir -p private-draft-store/status
           if [ -f generator/outputs/last-run.json ]; then
-            cp generator/outputs/last-run.json private-draft-store/status/last-run.json
+            python generator/work/runner_status.py private-draft-store generator/outputs/last-run.json
           fi
           cd private-draft-store
           git config user.name github-actions[bot]
