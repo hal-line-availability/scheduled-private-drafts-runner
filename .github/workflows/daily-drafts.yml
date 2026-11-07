@@ -90,6 +90,8 @@ jobs:
         if: steps.catchup.outputs.skip != 'true'
         env:
           GENERATION_OUTCOME: ${{ steps.generate.outcome }}
+          DRAFT_TRIGGER_EVENT: ${{ github.event_name }}
+          DRAFT_RUN_ID: ${{ github.run_id }}
           RUN_MODE: ${{ inputs.mode || 'prepare' }}
         run: |
           python - <<'PYTHON'
@@ -108,6 +110,8 @@ jobs:
               Path('generator/outputs/last-run.json').write_text(json.dumps({
                   'status': status if outcome=='success' else 'needs_attention',
                   'attempted_at': datetime.now(timezone.utc).isoformat(),
+                  'mode': 'github_scheduled' if os.environ['DRAFT_TRIGGER_EVENT']=='schedule' else 'github_manual',
+                  'run_id': os.environ['DRAFT_RUN_ID'],
                   'customer_sent': False,
                   **reason,
               }))
