@@ -147,6 +147,8 @@ jobs:
             git push origin HEAD:drafts
           fi
       - name: Confirm saved draft run
+        id: confirm_save
+        continue-on-error: true
         if: steps.catchup.outputs.skip != 'true' && steps.generate.outcome == 'success' && inputs.mode != 'verify'
         env:
           DRAFT_RUN_ID: ${{ github.run_id }}
@@ -160,8 +162,9 @@ jobs:
           git add status/last-run.json
           git commit -m 'Record private draft save confirmation'
           git push origin HEAD:drafts
+          python -c 'import json,sys; sys.exit(0 if json.load(open("status/last-run.json"))["status"]=="draft_prepared" else 1)'
       - name: Notify fixed Slack channel about stopped generation
-        if: steps.catchup.outputs.skip != 'true' && steps.generate.outcome == 'failure'
+        if: steps.catchup.outputs.skip != 'true' && (steps.generate.outcome == 'failure' || steps.confirm_save.outcome == 'failure')
         env:
           PRIVATE_DRAFTS_DEPLOY_KEY: ${{ secrets.PRIVATE_DRAFTS_DEPLOY_KEY }}
           SLACK_FAILURE_BOT_TOKEN: ${{ secrets.SLACK_FAILURE_BOT_TOKEN }}
@@ -170,7 +173,7 @@ jobs:
             echo 'The immediate Slack failure notice could not be confirmed. The fallback worker remains enabled.'
           fi
       - name: Report stopped generation
-        if: steps.catchup.outputs.skip != 'true' && steps.generate.outcome == 'failure'
+        if: steps.catchup.outputs.skip != 'true' && (steps.generate.outcome == 'failure' || steps.confirm_save.outcome == 'failure')
         run: |
           echo 'Source verification failed. Previous private drafts were retained. No customer delivery.'
           exit 1
