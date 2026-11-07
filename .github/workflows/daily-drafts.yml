@@ -91,12 +91,14 @@ jobs:
         env:
           GENERATION_OUTCOME: ${{ steps.generate.outcome }}
           DRAFT_TRIGGER_EVENT: ${{ github.event_name }}
+          DRAFT_AT_TARGET: ${{ inputs.at_target && 'true' || 'false' }}
+          DRAFT_NOT_BEFORE: ${{ inputs.not_before || '' }}
           DRAFT_RUN_ID: ${{ github.run_id }}
           RUN_MODE: ${{ inputs.mode || 'prepare' }}
         run: |
           python - <<'PYTHON'
           import json, os
-          from datetime import datetime, timezone
+          from datetime import datetime, timezone, timedelta
           from pathlib import Path
           outcome = os.environ['GENERATION_OUTCOME']
           status = 'verified' if os.environ['RUN_MODE']=='verify' else 'draft_prepared'
@@ -107,10 +109,16 @@ jobs:
               if outcome!='success' and failure.exists():
                   detail=json.loads(failure.read_text())
                   reason={key:detail[key] for key in ('reason','reason_code') if key in detail}
+              if os.environ['DRAFT_NOT_BEFORE']:
+                  target = datetime.fromisoformat(os.environ['DRAFT_NOT_BEFORE'])
+                  if target.utcoffset() is None:
+                      raise ValueError('Manual target requires timezone')
+                  reason['save_deadline'] = (target+timedelta(minutes=20)).isoformat()
               Path('generator/outputs/last-run.json').write_text(json.dumps({
                   'status': status if outcome=='success' else 'needs_attention',
                   'attempted_at': datetime.now(timezone.utc).isoformat(),
-                  'mode': 'github_scheduled' if os.environ['DRAFT_TRIGGER_EVENT']=='schedule' else 'github_manual',
+                  'mode': ('github_scheduled' if os.environ['DRAFT_TRIGGER_EVENT']=='schedule'
+                           else 'github_targeted' if os.environ['DRAFT_AT_TARGET']=='true' else 'github_manual'),
                   'run_id': os.environ['DRAFT_RUN_ID'],
                   'customer_sent': False,
                   **reason,
