@@ -138,6 +138,20 @@ jobs:
             git commit -m 'Prepare daily private drafts; no customer delivery'
             git push origin HEAD:drafts
           fi
+      - name: Confirm saved draft run
+        if: steps.catchup.outputs.skip != 'true' && steps.generate.outcome == 'success' && inputs.mode != 'verify'
+        env:
+          DRAFT_RUN_ID: ${{ github.run_id }}
+        run: |
+          cd private-draft-store
+          git fetch origin drafts
+          git reset --hard FETCH_HEAD
+          cd ..
+          python generator/work/runner_status.py --confirm private-draft-store "$DRAFT_RUN_ID"
+          cd private-draft-store
+          git add status/last-run.json
+          git commit -m 'Record private draft save confirmation'
+          git push origin HEAD:drafts
       - name: Notify fixed Slack channel about stopped generation
         if: steps.catchup.outputs.skip != 'true' && steps.generate.outcome == 'failure'
         env:
