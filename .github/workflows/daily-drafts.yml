@@ -81,6 +81,8 @@ jobs:
         continue-on-error: true
         env:
           SOURCE_DATABASE_URL: ${{ secrets.SOURCE_DATABASE_URL }}
+          LINE_SOURCE_STATUS_URL: ${{ secrets.LINE_SOURCE_STATUS_URL }}
+          LINE_SOURCE_STATUS_READ_KEY: ${{ secrets.LINE_SOURCE_STATUS_READ_KEY }}
           RUN_MODE: ${{ inputs.mode || 'prepare' }}
           DRAFT_RETRY_MINUTES: '20'
           DRAFT_SCHEDULED_RUN: ${{ (github.event_name == 'schedule' || inputs.at_target == true) && 'true' || 'false' }}
@@ -90,11 +92,15 @@ jobs:
         if: steps.catchup.outputs.skip != 'true'
         env:
           GENERATION_OUTCOME: ${{ steps.generate.outcome }}
+          DRAFT_TRIGGER_EVENT: ${{ github.event_name }}
+          DRAFT_AT_TARGET: ${{ inputs.at_target && 'true' || 'false' }}
+          DRAFT_NOT_BEFORE: ${{ inputs.not_before || '' }}
+          DRAFT_RUN_ID: ${{ github.run_id }}
           RUN_MODE: ${{ inputs.mode || 'prepare' }}
         run: |
           python - <<'PYTHON'
           import json, os
-          from datetime import datetime, timezone
+          from datetime import datetime, timezone, timedelta
           from pathlib import Path
           outcome = os.environ['GENERATION_OUTCOME']
           status = 'verified' if os.environ['RUN_MODE']=='verify' else 'draft_prepared'
@@ -103,11 +109,31 @@ jobs:
               reason={}
               failure=Path('generator/outputs/source-not-ready.json')
               if outcome!='success' and failure.exists():
-                  detail=json.loads(failure.read_text())
-                  reason={key:detail[key] for key in ('reason','reason_code') if key in detail}
+                  try:
+                      detail=json.loads(failure.read_text())
+                      if not isinstance(detail, dict):
+                          raise ValueError('Invalid failure record')
+                      reason={key:detail[key][:300] for key in ('reason','reason_code')
+                              if isinstance(detail.get(key), str)}
+                  except (ValueError, OSError):
+                      reason={'reason':'失敗理由の記録を読み取れませんでした。前回の下書きを保持しています。',
+                              'reason_code':'failure_record_unreadable'}
+              if os.environ['DRAFT_NOT_BEFORE']:
+                  try:
+                      target = datetime.fromisoformat(os.environ['DRAFT_NOT_BEFORE'])
+                      if target.utcoffset() is None:
+                          raise ValueError('Manual target requires timezone')
+                      reason['save_deadline'] = (target+timedelta(minutes=20)).isoformat()
+                  except (ValueError, OverflowError):
+                      outcome = 'failure'
+                      reason.update(reason='手動指定日時が不正です。タイムゾーン付き日時を指定してください。',
+                                    reason_code='invalid_manual_target')
               Path('generator/outputs/last-run.json').write_text(json.dumps({
                   'status': status if outcome=='success' else 'needs_attention',
                   'attempted_at': datetime.now(timezone.utc).isoformat(),
+                  'mode': ('github_scheduled' if os.environ['DRAFT_TRIGGER_EVENT']=='schedule'
+                           else 'github_targeted' if os.environ['DRAFT_AT_TARGET']=='true' else 'github_manual'),
+                  'run_id': os.environ['DRAFT_RUN_ID'],
                   'customer_sent': False,
                   **reason,
               }))
@@ -134,8 +160,25 @@ jobs:
             git commit -m 'Prepare daily private drafts; no customer delivery'
             git push origin HEAD:drafts
           fi
+      - name: Confirm saved draft run
+        id: confirm_save
+        continue-on-error: true
+        if: steps.catchup.outputs.skip != 'true' && steps.generate.outcome == 'success' && inputs.mode != 'verify'
+        env:
+          DRAFT_RUN_ID: ${{ github.run_id }}
+        run: |
+          cd private-draft-store
+          git fetch origin drafts
+          git reset --hard FETCH_HEAD
+          cd ..
+          python generator/work/runner_status.py --confirm private-draft-store "$DRAFT_RUN_ID"
+          cd private-draft-store
+          git add status/last-run.json
+          git commit -m 'Record private draft save confirmation'
+          git push origin HEAD:drafts
+          python -c 'import json,sys; sys.exit(0 if json.load(open("status/last-run.json"))["status"]=="draft_prepared" else 1)'
       - name: Notify fixed Slack channel about stopped generation
-        if: steps.catchup.outputs.skip != 'true' && steps.generate.outcome == 'failure'
+        if: steps.catchup.outputs.skip != 'true' && (steps.generate.outcome == 'failure' || steps.confirm_save.outcome == 'failure')
         env:
           PRIVATE_DRAFTS_DEPLOY_KEY: ${{ secrets.PRIVATE_DRAFTS_DEPLOY_KEY }}
           SLACK_FAILURE_BOT_TOKEN: ${{ secrets.SLACK_FAILURE_BOT_TOKEN }}
@@ -144,7 +187,7 @@ jobs:
             echo 'The immediate Slack failure notice could not be confirmed. The fallback worker remains enabled.'
           fi
       - name: Report stopped generation
-        if: steps.catchup.outputs.skip != 'true' && steps.generate.outcome == 'failure'
+        if: steps.catchup.outputs.skip != 'true' && (steps.generate.outcome == 'failure' || steps.confirm_save.outcome == 'failure')
         run: |
           echo 'Source verification failed. Previous private drafts were retained. No customer delivery.'
           exit 1
