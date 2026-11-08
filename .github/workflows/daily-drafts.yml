@@ -81,6 +81,8 @@ jobs:
         continue-on-error: true
         env:
           SOURCE_DATABASE_URL: ${{ secrets.SOURCE_DATABASE_URL }}
+          LINE_SOURCE_STATUS_URL: ${{ secrets.LINE_SOURCE_STATUS_URL }}
+          LINE_SOURCE_STATUS_READ_KEY: ${{ secrets.LINE_SOURCE_STATUS_READ_KEY }}
           RUN_MODE: ${{ inputs.mode || 'prepare' }}
           DRAFT_RETRY_MINUTES: '20'
           DRAFT_SCHEDULED_RUN: ${{ (github.event_name == 'schedule' || inputs.at_target == true) && 'true' || 'false' }}
