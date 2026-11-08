@@ -10,3 +10,14 @@ first event. It verifies the private manifest and both message hashes first; whe
 the 17:30 pair is complete, it exits without rewriting drafts or owner edits.
 Recovery only replaces the private unsent draft pair and has no LINE
 customer-delivery path.
+
+Preparation requires `SOURCE_DATABASE_URL`, `LINE_SOURCE_STATUS_URL`, and
+`LINE_SOURCE_STATUS_READ_KEY` in this repository's Actions secrets. The status
+key is read-only and must not be replaced with the source application's general
+internal API key. Missing status confirmation stops preparation and retains the
+previous drafts.
+
+Validate the result recorder locally with Python, PyYAML, and
+`python -m unittest discover -s tests -v`. Invalid manual times and damaged
+failure reports must still produce a private `needs_attention` record. No
+credentials or network access are used by these checks.
